@@ -2,45 +2,41 @@
 
 #include <SPI.h>
 #include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#define I2C_ADDRESS 0x3C
+#include "SSD1306Ascii.h"
+#include "SSD1306AsciiWire.h"
+#include "MAX6675.h"
 
-#define analogPin  A0 
+#define analogPin  A7 
 #define beta 3950
 #define resistance 100 
-#define SCREEN_WIDTH 128 
-#define SCREEN_HEIGHT 32 
-#define OLED_RESET     -1 
-#define SCREEN_ADDRESS 0x3C 
-#define SCREEN_ADDRESS_2 0x3C
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
+SSD1306AsciiWire oled;
+
+float temperature = 0;
+MAX6675           myMAX6675(5);
 
 void setup() {
+  Wire.begin(); 
   Serial.begin(9600);
+  oled.begin(&Adafruit128x64, I2C_ADDRESS);
+  oled.setFont(System5x7);
+  oled.clear();
+myMAX6675.begin();
 
-  
-  if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
-    Serial.println(F("SSD1306 allocation failed"));
-    for(;;); 
+  while (myMAX6675.getChipID() != MAX6675_ID)
+  {
+    oled.setCursor(0, 0);
+    oled.print("MAX6675 error");
+    delay(5000);
   }
-  
-  if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS_2)) {
-    Serial.println(F("SSD1306 allocation failed"));
-    for(;;);
-  }
-  
-  display.display();
-  delay(2000); // Pause for 2 seconds
-  display.clearDisplay();
-  display.drawPixel(10, 10, SSD1306_WHITE);
-  display.display();
+
+  oled.clear();
+  oled.print("MAX6675 OK");
   delay(2000);
-  display.invertDisplay(true);
-  delay(1000);
-  display.invertDisplay(false);
-  delay(1000);
 
+  if   (myMAX6675.detectThermocouple() == true) Serial.println(F("K-Thermocouple is connected to MAX6675 terminals 'T+' & 'T-'"));
+  else                                          Serial.println(F("K-Thermocouple is broken, unplugged or 'T-' terminal is not grounded"));
 }
 
 void loop() {
@@ -48,18 +44,19 @@ void loop() {
   long a = analogRead(analogPin);
   float tempC = beta /(log((1025.0 * 10 / a - 10) / 10) + beta / 298.0) - 273.0;
   delay(200);
+  temperature = myMAX6675.getTemperature();
   
-  display.clearDisplay();
-
-  display.setTextSize(1);             // Normal 1:1 pixel scale
-  display.setTextColor(SSD1306_WHITE);        // Draw white text
-  display.setCursor(0,0);             // Start at top-left corner
-  display.println(F("TempC:  "));
-  display.println(tempC);
-  display.println("  C");
-
-
-
-  display.display();
+  oled.clear();
+  oled.println(F("Víz:  "));
+  oled.println(tempC);
+  oled.println("  C");
+  
+  oled.setCursor(0,31);
+  oled.println("Füst: "); 
+  if (temperature != MAX6675_ERROR) oled.print(temperature, 1);
+  else                              oled.print(F("xx"));       
+  oled.println("  C");  
   delay(2000);
+
+  
 }
